@@ -19,12 +19,10 @@ import scala.collection.mutable
   */
 object MongoJsonFunc extends App {
 
-    val view = Seq("*")
-
     //从最终的DBObject中 过滤需要的字段
     //lateral view explode(a.b.c) s as x, y , z
     //处理 as 之后的元素, 选出 x, y, z
-    def filterAsColumn(last: Seq[DBObject]): List[Map[String, Any]] = {
+    def filterAsColumn(last: Seq[DBObject], view: Seq[String]): List[Map[String, Any]] = {
         val x = last.map { item =>
             item match {
                 case bl: BasicDBList =>
@@ -56,7 +54,7 @@ object MongoJsonFunc extends App {
     //select * from db.table lateral view explode(a.b.c) s as x, y
     //展开view的columns(a.b.c), 拿到doc中最深层的那个列,将其展开,拿出具体的 x, y
     //组装成List[Map[x->v]]
-    def explodeLateralViewTable(cc: Seq[String], dbo: DBObject): List[Map[String, Any]] = {
+    def explodeLateralViewTable(cc: Seq[String], dbo: DBObject, view: Seq[String]): List[Map[String, Any]] = {
         //展开column (a.b.c) 从 DBObject 中依次取到 a -> b ->c
         def iteraColumn(cs: Seq[String], o: DBObject): Seq[DBObject] = {
             def iteraDBObject(dbo: DBObject, x: String): Seq[DBObject] = dbo match {
@@ -78,10 +76,10 @@ object MongoJsonFunc extends App {
         }
 
         val last = iteraColumn(cc, dbo)
-        filterAsColumn(last)
+        filterAsColumn(last, view)
     }
 
-    def flattenLateralViewTable(flattenStr: Seq[String], dbo: Seq[DBObject]): List[Map[String, Any]] = {
+    def flattenLateralViewTable(flattenStr: Seq[String], dbo: Seq[DBObject], view: Seq[String]): List[Map[String, Any]] = {
         var flattenSeq = flattenStr
         var originDBO = dbo
         val result = mutable.ListBuffer[Map[String, Any]]()
@@ -126,8 +124,9 @@ object MongoJsonFunc extends App {
             originDBO = seqDBO
             flattenSeq = flattenSeq.tail
         }
-        collect(originDBO)
-        result.toList
+        //collect(originDBO)
+        //result.toList
+        filterAsColumn(originDBO, view)
     }
 
     val json =
@@ -162,10 +161,13 @@ object MongoJsonFunc extends App {
 
     val dbo = BasicDBObject.parse(json)
 
+    //
     val find = "data.rows"
-    val res = explodeLateralViewTable(find.split("\\.").toSeq, dbo)
+    //剪裁列
+    val view = Seq("success","errorMsg","name", "createTime", "workName")
+    val res = explodeLateralViewTable(find.split("\\.").toSeq, dbo, view)
     println(res)
-    val res2 = flattenLateralViewTable(find.split("\\.").toSeq, dbo :: Nil)
+    val res2 = flattenLateralViewTable(find.split("\\.").toSeq, dbo :: Nil, view)
     println(res2)
 }
 
