@@ -162,12 +162,18 @@ object MongoJsonFunc extends App {
     val dbo = BasicDBObject.parse(json)
 
     //
-    val find = "data.rows"
+    val find = "data.rows".split("\\.").toSeq
     //剪裁列
-    val view = Seq("success","errorMsg","name", "createTime", "workName")
-    val res = explodeLateralViewTable(find.split("\\.").toSeq, dbo, view)
+    val view = Seq("success", "errorMsg", "total", "name", "workName")
+
+    //下钻就是只取find最下层
+    val res = explodeLateralViewTable(find, dbo, view)
     println(res)
-    val res2 = flattenLateralViewTable(find.split("\\.").toSeq, dbo :: Nil, view)
+    //List(Map(name -> 流程步骤名称, success -> null, errorMsg -> null, total -> null, workName -> 任务名称), Map(name -> 流程, success -> null, errorMsg -> null, total -> null, workName -> 名称))
+
+    //平展是将外层一层层铺到下层
+    val res2 = flattenLateralViewTable(find, dbo :: Nil, view)
     println(res2)
+    //List(Map(name -> 流程步骤名称, success -> 0, errorMsg -> 错误消息, total -> 总记录数, workName -> 任务名称), Map(name -> 流程, success -> 0, errorMsg -> 错误消息, total -> 总记录数, workName -> 名称))
 }
 
